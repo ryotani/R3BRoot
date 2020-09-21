@@ -156,6 +156,7 @@ ext_h101_ams.h
 ext_h101_music.h
 ext_h101_samp.h
 ext_h101_pdc.h
+ext_h101_trlo.h
 )
 
 # fill list of header files from list of source files
