@@ -42,7 +42,7 @@ R3BMusicMapped2Cal::R3BMusicMapped2Cal()
     , fNumAnodesRef(MAX_NB_MUSICTREF) // 1 anode for TREF + 1 for trigger
     , fMaxMult(MAX_MULT_MUSIC_CAL)
     , fNumParams(3)
-    , fNumPosParams(2)
+    , fNumPosParams(3)
     , fMaxSigma(200)
     , CalParams(NULL)
     , PosParams(NULL)
@@ -60,7 +60,7 @@ R3BMusicMapped2Cal::R3BMusicMapped2Cal(const char* name, Int_t iVerbose)
     , fNumAnodesRef(MAX_NB_MUSICTREF) // 1 anode for TREF + 1 for trigger
     , fMaxMult(MAX_MULT_MUSIC_CAL)
     , fNumParams(3)
-    , fNumPosParams(2)
+    , fNumPosParams(3)
     , fMaxSigma(200)
     , CalParams(NULL)
     , PosParams(NULL)
@@ -215,7 +215,7 @@ void R3BMusicMapped2Cal::Exec(Option_t* option)
 
         if (anodeId < fNumAnodes && fCal_Par->GetInUse(anodeId + 1) == 1)
         {
-            pedestal = CalParams->GetAt(fNumParams * anodeId + 1);
+            pedestal = CalParams->GetAt(fNumParams * anodeId);
             // sigma=CalParams->GetAt(fNumParams*anodeId+2);
             // LOG(INFO) << detId << " " << anodeId<<" "<< mappedData[i]->GetEnergy()<< " " << pedestal;
             energy[mulanode[anodeId]][anodeId] = mappedData[i]->GetEnergy() - pedestal;
@@ -237,11 +237,14 @@ void R3BMusicMapped2Cal::Exec(Option_t* option)
         {
             Float_t a0 = PosParams->GetAt(fNumPosParams * i);
             Float_t a1 = PosParams->GetAt(fNumPosParams * i + 1);
+	    Float_t a2 = fNumPosParams==3?PosParams->GetAt(fNumPosParams * i + 2):0.;
             for (Int_t j = 0; j < mulanode[fNumAnodes]; j++)
                 for (Int_t k = 0; k < mulanode[i]; k++)
                 {
                     if (energy[k][i] > 0.)
-                        AddCalData(i, a0 + a1 * (dtime[k][i] - dtime[j][fNumAnodes]), energy[k][i]);
+                        AddCalData(i,
+				   a0 + a1 * (dtime[k][i] - dtime[j][fNumAnodes]) + a2 * energy[k][i],
+				   energy[k][i]);
                 }
         }
     }

@@ -19,6 +19,7 @@
 // ROOT headers
 #include "TClonesArray.h"
 #include "TF1.h"
+#include "TF2.h"
 #include "TGraph.h"
 #include "TMath.h"
 #include "TRandom.h"
@@ -44,11 +45,11 @@ R3BMusicMapped2CalPar::R3BMusicMapped2CalPar()
     , fNumAnodes(MAX_NB_MUSICANODE)   // 8 anodes
     , fNumAnodesRef(MAX_NB_MUSICTREF) // 1 anode for TREF + 1 for trigger
     , fMaxMult(MAX_MULT_MUSIC_CAL)
-    , fMinStadistics(1000)
+    , fMinStatistics(1000)
     , fLimit_left(10000)
     , fLimit_right(24000)
     , fNumParams(3)
-    , fNumPosParams(2)
+    , fNumPosParams(3)
     , fMaxSigma(200)
     , CalParams(NULL)
     , PosParams(NULL)
@@ -73,11 +74,11 @@ R3BMusicMapped2CalPar::R3BMusicMapped2CalPar(const TString& name,
     , fNumAnodes(MAX_NB_MUSICANODE)   // 8 anodes
     , fNumAnodesRef(MAX_NB_MUSICTREF) // 1 anode for TREF + 1 for trigger
     , fMaxMult(MAX_MULT_MUSIC_CAL)
-    , fMinStadistics(1000)
+    , fMinStatistics(1000)
     , fLimit_left(10000)
     , fLimit_right(24000)
     , fNumParams(3)
-    , fNumPosParams(2)
+    , fNumPosParams(3)
     , fMaxSigma(200)
     , CalParams(NULL)
     , PosParams(NULL)
@@ -155,6 +156,9 @@ InitStatus R3BMusicMapped2CalPar::Init()
     // Define TGraph for fits
     char Name1[255];
     fg_anode = new TGraph*[fNumAnodes];
+    fg_anode_result = new TGraph*[fNumAnodes];
+    fg_anode2d = new TGraph2D*[fNumAnodes];
+
     for (Int_t i = 0; i < fNumAnodes; i++)
     {
         fg_anode[i] = new TGraph();
@@ -166,6 +170,26 @@ InitStatus R3BMusicMapped2CalPar::Init()
         fg_anode[i]->SetMarkerColor(4);
         fg_anode[i]->SetMarkerStyle(20);
         fg_anode[i]->SetMarkerSize(1.2);
+	//
+        fg_anode_result[i] = new TGraph();
+        sprintf(Name1, "fg1_Anode_result_%d", i + 1);
+        fg_anode_result[i]->SetName(Name1);
+        fg_anode_result[i]->SetTitle(Name1);
+        fg_anode_result[i]->SetFillColor(1);
+        fg_anode_result[i]->SetLineColor(0);
+        fg_anode_result[i]->SetMarkerColor(4);
+        fg_anode_result[i]->SetMarkerStyle(20);
+        fg_anode_result[i]->SetMarkerSize(1.2);
+	//
+        fg_anode2d[i] = new TGraph2D();
+        sprintf(Name1, "fg1_Anode2d_%d; Drift Time (ns); Energy (a.u.); Position (mm)", i + 1);
+        fg_anode2d[i]->SetName(Name1);
+        fg_anode2d[i]->SetTitle(Name1);
+        fg_anode2d[i]->SetFillColor(1);
+        fg_anode2d[i]->SetLineColor(0);
+        fg_anode2d[i]->SetMarkerColor(4);
+        fg_anode2d[i]->SetMarkerStyle(20);
+        fg_anode2d[i]->SetMarkerSize(1.2);
     }
 
     return kSUCCESS;
@@ -243,12 +267,20 @@ void R3BMusicMapped2CalPar::Exec(Option_t* option)
             for (Int_t j = 0; j < mulanode[fNumAnodes]; j++)
                 for (Int_t k = 0; k < mulanode[i]; k++)
                 {
+                    if (fLimit_left > dtime[k][i] - dtime[j][fNumAnodes] || fLimit_right < dtime[k][i] - dtime[j][fNumAnodes] ) continue;
                     if (energy[k][i] > 0.)
                     { // Anode is 50mm, first anode is at 175mm with respect to the center of music detector
-                        fg_anode[i]->SetPoint(fg_anode[i]->GetN() + 1,
+		      if(fg_anode[i]->GetN()<=fMinStatistics)
+                        fg_anode[i]->SetPoint(fg_anode[i]->GetN(),
                                               dtime[k][i] - dtime[j][fNumAnodes],
                                               fa->Eval(fPosMusic - 175.0 + i * 50.0));
                     }
+		    if(fg_anode2d[i]->GetN()<=fMinStatistics){
+		      fg_anode2d[i]->SetPoint(fg_anode2d[i]->GetN(),
+					      dtime[k][i] - dtime[j][fNumAnodes],
+					      energy[k][i],
+					      fa->Eval(fPosMusic - 175.0 + i * 50.0));
+		    }
                 }
         }
     }
@@ -269,6 +301,7 @@ void R3BMusicMapped2CalPar::Reset() {}
 
 void R3BMusicMapped2CalPar::FinishTask()
 {
+  LOG(INFO) << "R3BMusicMapped2CalPar: FinishTask. Num Anodes: " << fNumAnodes;
     fCal_Par->SetNumAnodes(fNumAnodes);
     fCal_Par->SetNumParamsEFit(fNumParams);
     fCal_Par->SetNumParamsPosFit(fNumPosParams);
@@ -276,10 +309,13 @@ void R3BMusicMapped2CalPar::FinishTask()
     fCal_Par->GetPosParams()->Set(fNumPosParams * fNumAnodes);
 
     TF1* fit = new TF1("fit", "pol1", fLimit_left, fLimit_right);
+    TF2* fit2d = new TF2("fit2d", "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0,8000);
+    TF1* fit_result = new TF1("fit_result", "pol1", fLimit_left, fLimit_right);
     fit->SetLineColor(2);
     for (Int_t i = 0; i < fNumAnodes; i++)
     {
-        if (fg_anode[i]->GetN() > fMinStadistics)
+      /*
+        if (fg_anode[i]->GetN() >= fMinStatistics)
         {
             fCal_Par->SetInUse(1, i + 1);
             fg_anode[i]->Fit("fit", "QR0");
@@ -290,9 +326,41 @@ void R3BMusicMapped2CalPar::FinishTask()
         }
         else
             fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
-        // fg_anode[i]->Draw("p");
-        // fit->Draw("same");
+      */
+	//  fg_anode[i]->Draw("p");
+	//  fit->Draw("same");
         fg_anode[i]->Write();
+	//
+	if (fg_anode2d[i]->GetN() >= fMinStatistics)
+	  {
+	    fg_anode2d[i]->Fit("fit2d", "QR0");
+	    Double_t par[fNumPosParams];
+	    fit2d->GetParameters(&par[0]);
+	    fCal_Par->SetPosParams(par[0], i * fNumPosParams); // Position
+	    fCal_Par->SetPosParams(par[1], i * fNumPosParams + 1); // Coefficient to DT
+	    fCal_Par->SetPosParams(par[2] + fCal_Par->GetAnodeCalParams()->GetAt(i * fNumParams), i * fNumPosParams + 2); // Coefficient to Energy. Pedestal added for consistency.
+	    //
+	    fg_anode2d[i]->Draw("p");
+	    fit2d->Draw("same");
+	    fg_anode2d[i]->Write();
+	    //
+	    /*
+	    for(Int_t n = 0; n < fg_anode2d[i]->GetN(); n++)
+	      {
+		Double_t ene = 0., dt = 0., val = 0.;
+		fg_anode2d[i]->GetPoint(n, dt, ene, val);
+		fg_anode_result[i]->SetPoint(n,
+					  dt,
+					  val - fit2d->GetParameter(2) * ene);
+	      }
+	    fg_anode_result[i]->Fit("fit_result","QR0");
+	    fg_anode_result[i]->Draw("p");
+	    fit_result->Draw("same");
+	    fg_anode_result[i]->Write();
+	    */
+	  }
+	else
+	  fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
     }
     fCal_Par->setChanged();
 }

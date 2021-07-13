@@ -24,6 +24,7 @@
 #include "R3BMusicMapped2Cal.h"
 #include "R3BMusicMappedData.h"
 #include "TGraph.h"
+#include "TGraph2D.h"
 #include "TH1F.h"
 
 class TClonesArray;
@@ -82,7 +83,7 @@ class R3BMusicMapped2CalPar : public FairTask
   private:
     Int_t fNumAnodes;
     Int_t fMaxMult;
-    Int_t fMinStadistics;
+    Int_t fMinStatistics;
     Int_t fNumParams;
     Int_t fNumPosParams;
     Int_t fNumAnodesRef;
@@ -107,7 +108,8 @@ class R3BMusicMapped2CalPar : public FairTask
     TClonesArray* fHitItemsMwpcA;     /**< Array with hit items. */
     TClonesArray* fHitItemsMwpcB;     /**< Array with hit items. */
 
-    TGraph** fg_anode;
+    TGraph** fg_anode, **fg_anode_result;
+    TGraph2D** fg_anode2d;
 
   public:
     // Class definition
