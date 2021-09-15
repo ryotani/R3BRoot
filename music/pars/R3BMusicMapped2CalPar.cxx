@@ -330,7 +330,7 @@ void R3BMusicMapped2CalPar::FinishTask()
 	    fit2d->Draw("same");
 	    fg_anode2d[i]->Write();
 	    //
-	    /*
+	    
 	    for(Int_t n = 0; n < fg_anode2d[i]->GetN(); n++)
 	      {
 		Double_t ene = 0., dt = 0., val = 0.;
@@ -339,11 +339,11 @@ void R3BMusicMapped2CalPar::FinishTask()
 					  dt,
 					  val - fit2d->GetParameter(2) * ene);
 	      }
-	    fg_anode_result[i]->Fit("fit_result","QR0");
+	    fg_anode_result[i]->Fit("fit_result","QR");
 	    fg_anode_result[i]->Draw("p");
 	    fit_result->Draw("same");
 	    fg_anode_result[i]->Write();
-	    */
+	    
 	  }
 	else
 	  fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
