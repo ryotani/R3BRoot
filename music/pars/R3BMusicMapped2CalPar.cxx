@@ -319,6 +319,7 @@ void R3BMusicMapped2CalPar::FinishTask()
 	//
 	if (fg_anode2d[i]->GetN() >= fMinStatistics)
 	  {
+	    fit2d->FixParameter(2,0);
 	    fg_anode2d[i]->Fit("fit2d", "QR0");
 	    Double_t par[fNumPosParams];
 	    fit2d->GetParameters(&par[0]);
