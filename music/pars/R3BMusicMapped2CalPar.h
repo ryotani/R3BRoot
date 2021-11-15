@@ -27,6 +27,10 @@
 #include "TGraph2D.h"
 #include "TH1F.h"
 
+#include "Fit/BinData.h"
+#include "Fit/Fitter.h"
+#include "Math/WrappedMultiTF1.h"
+
 class TClonesArray;
 class R3BMusicCalPar;
 
@@ -104,6 +108,8 @@ class R3BMusicMapped2CalPar : public FairTask
     TGraph** fg_anode, **fg_anode_result;
     TGraph2D** fg_anode2d;
 
+    std::vector<Float_t> v_pos[32], v_dt[32], v_e[32];
+    
   public:
     // Class definition
     ClassDef(R3BMusicMapped2CalPar, 1)

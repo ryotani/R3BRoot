@@ -273,6 +273,9 @@ void R3BMusicMapped2CalPar::Exec(Option_t* option)
 					      energy[k][i],
 					      fa->Eval(fPosMusic - 175.0 + i * 50.0));
 		    }
+		    v_pos[i].push_back(fa->Eval(fPosMusic - 175.0 + i * 50.0));
+		    v_dt[i].push_back(dtime[k][i] - dtime[j][fNumAnodes]);
+		    v_e[i].push_back(energy[k][i]);
                 }
         }
     }
@@ -319,8 +322,8 @@ void R3BMusicMapped2CalPar::FinishTask()
 	//
 	if (fg_anode2d[i]->GetN() >= fMinStatistics)
 	  {
-	    fit2d->FixParameter(2,0);
-	    fg_anode2d[i]->Fit("fit2d", "QR0");
+	    //fit2d->FixParameter(2,0);
+	    fg_anode2d[i]->Fit("fit2d", "R0");
 	    Double_t par[fNumPosParams];
 	    fit2d->GetParameters(&par[0]);
 	    fCal_Par->SetPosParams(par[0], i * fNumPosParams); // Position
@@ -348,6 +351,35 @@ void R3BMusicMapped2CalPar::FinishTask()
 	  }
 	else
 	  fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
+	//
+	if(v_pos[i].size()!=v_dt[i].size()||v_pos[i].size()!=v_e[i].size())
+	  LOG(ERROR)<<"Size of vectors are different";
+	ROOT::Fit::BinData points(v_pos[i].size(),2);
+	Double_t xx[2];
+	//for(int i_v=0; i_v < v_pos[i].size(); i_v++)
+	for(int i_v=0; i_v < 1000; i_v++)
+	{
+	  xx[0] = v_dt[i].at(i_v);
+	  xx[1] = v_e[i].at(i_v);
+	  points.Add(xx, v_pos[i].at(i_v),1);
+	}
+	ROOT::Fit::Fitter fitter;
+	//TF2* fit2d_2 = new TF2(Form("fit2d_2%i",i), "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0,8000);
+	ROOT::Math::WrappedMultiTF1 wf(*fit2d);
+	fitter.SetFunction(wf);
+	//
+	bool ret = fitter.Fit(points);
+	//	LOG(INFO)<<"Fitter for "<<i<<" size "<< v_pos[i].size() <<" "<<ret;
+	if (ret ||1 ){
+	  const ROOT::Fit::FitResult & res = fitter.Result();
+	  // print result (should be around 1)
+	  res.Print(std::cout);
+	  // copy all fit result info (values, chi2, etc..) in TF3
+	  fit2d->SetFitResult(res);
+	  // test fit p-value (chi2 probability)
+	  double prob = res.Prob();
+	  LOG(INFO)<< "Good fit : p-value  = " << prob << std::endl;
+	}
     }
     fCal_Par->setChanged();
 }
