@@ -42,7 +42,8 @@ R3BMwpc1Cal2Hit::R3BMwpc1Cal2Hit()
 // R3BMwpc1Cal2Hit: Standard Constructor --------------------------
 R3BMwpc1Cal2Hit::R3BMwpc1Cal2Hit(const char* name, Int_t iVerbose)
     : FairTask(name, iVerbose)
-    , fMwpcCalDataCA(NULL)
+    , fMwpcCalDataCA1(NULL)
+    , fMwpcCalDataCA2(NULL)
     , fMwpcHitDataCA(NULL)
     , fwx(3.125)   // in mm
     , fwy(5.000)   // in mm
@@ -72,8 +73,14 @@ InitStatus R3BMwpc1Cal2Hit::Init()
         return kFATAL;
     }
 
-    fMwpcCalDataCA = (TClonesArray*)rootManager->GetObject("Mwpc1CalData");
-    if (!fMwpcCalDataCA)
+    fMwpcCalDataCA1 = (TClonesArray*)rootManager->GetObject("Mwpc1CalData");
+    if (!fMwpcCalDataCA1)
+    {
+        return kFATAL;
+    }
+
+    fMwpcCalDataCA2 = (TClonesArray*)rootManager->GetObject("Mwpc2CalData");
+    if (!fMwpcCalDataCA2)
     {
         R3BLOG(FATAL, "Mwpc1CalData not found");
         return kFATAL;
@@ -98,13 +105,13 @@ void R3BMwpc1Cal2Hit::Exec(Option_t* option)
     Reset();
 
     // Reading the Input -- Cal Data --
-    Int_t nHits = fMwpcCalDataCA->GetEntries();
-    if (!nHits)
+    Int_t nHits1 = fMwpcCalDataCA1->GetEntries();
+    if (!nHits1)
         return;
 
     // Data from cal level
     R3BMwpcCalData** calData;
-    calData = new R3BMwpcCalData*[nHits];
+    calData = new R3BMwpcCalData*[nHits1];
     Int_t planeId;
     Int_t padId;
     Int_t padmx = -1, padmxu = -1, padmxd = -1, padmy = -1;
@@ -117,9 +124,9 @@ void R3BMwpc1Cal2Hit::Exec(Option_t* option)
     for (Int_t i = 0; i < Mw1PadsY; i++)
         fy[i] = 0;
 
-    for (Int_t i = 0; i < nHits; i++)
+    for (Int_t i = 0; i < nHits1; i++)
     {
-        calData[i] = (R3BMwpcCalData*)(fMwpcCalDataCA->At(i));
+        calData[i] = (R3BMwpcCalData*)(fMwpcCalDataCA1->At(i));
         planeId = calData[i]->GetPlane();
         padId = calData[i]->GetPad() - 1; // From 0 to 63 for X down and up
         q = calData[i]->GetQ();
@@ -127,14 +134,31 @@ void R3BMwpc1Cal2Hit::Exec(Option_t* option)
         // FIXME: in November this should be OK!
         if (planeId == 1 || planeId == 2)
             fx[padId] += q; // Xup+Xdown
-        else
-            fy[padId] = q;
 
         if (q > qmx && (planeId == 1 || planeId == 2))
         {
             qmx = q;
             padmx = padId;
         }
+    }
+    // Reading the Input -- Cal Data for Y --
+    Int_t nHits2 = fMwpcCalDataCA2->GetEntries();
+    if (!nHits2)
+        return;
+
+    // Data from cal level
+    R3BMwpcCalData** calData2;
+    calData2 = new R3BMwpcCalData*[nHits2];
+
+    for (Int_t i = 0; i < nHits2; i++)
+    {
+        calData2[i] = (R3BMwpcCalData*)(fMwpcCalDataCA2->At(i));
+        planeId = calData2[i]->GetPlane();
+        padId = calData2[i]->GetPad(); // From 0 to 63 for X down and up
+        q = calData2[i]->GetQ();
+
+        if (planeId == 3)
+            fy[padId] = q;
         if (q > qmy && planeId == 3)
         {
             qmy = q;
@@ -161,6 +185,8 @@ void R3BMwpc1Cal2Hit::Exec(Option_t* option)
 
     if (calData)
         delete calData;
+    if (calData2)
+        delete calData2;
     return;
 }
 

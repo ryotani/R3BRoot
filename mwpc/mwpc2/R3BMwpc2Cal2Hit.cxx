@@ -40,7 +40,8 @@ R3BMwpc2Cal2Hit::R3BMwpc2Cal2Hit()
 // R3BMwpc2Cal2Hit: Standard Constructor --------------------------
 R3BMwpc2Cal2Hit::R3BMwpc2Cal2Hit(const char* name, Int_t iVerbose)
     : FairTask(name, iVerbose)
-    , fMwpcCalDataCA(NULL)
+    , fMwpcCalDataCA1(NULL)
+    , fMwpcCalDataCA2(NULL)
     , fMwpcHitDataCA(NULL)
     , fwx(3.125)   // in mm
     , fwy(5.000)   // in mm
@@ -69,8 +70,14 @@ InitStatus R3BMwpc2Cal2Hit::Init()
         return kFATAL;
     }
 
-    fMwpcCalDataCA = (TClonesArray*)rootManager->GetObject("Mwpc2CalData");
-    if (!fMwpcCalDataCA)
+    fMwpcCalDataCA1 = (TClonesArray*)rootManager->GetObject("Mwpc1CalData");
+    if (!fMwpcCalDataCA1)
+    {
+        return kFATAL;
+    }
+
+    fMwpcCalDataCA2 = (TClonesArray*)rootManager->GetObject("Mwpc2CalData");
+    if (!fMwpcCalDataCA2)
     {
         return kFATAL;
     }
@@ -93,7 +100,7 @@ void R3BMwpc2Cal2Hit::Exec(Option_t* option)
     Reset();
 
     // Reading the Input -- Cal Data --
-    Int_t nHits = fMwpcCalDataCA->GetEntries();
+    Int_t nHits = fMwpcCalDataCA2->GetEntries();
     if (!nHits)
         return;
 
@@ -114,22 +121,39 @@ void R3BMwpc2Cal2Hit::Exec(Option_t* option)
 
     for (Int_t i = 0; i < nHits; i++)
     {
-        calData[i] = (R3BMwpcCalData*)(fMwpcCalDataCA->At(i));
+        calData[i] = (R3BMwpcCalData*)(fMwpcCalDataCA2->At(i));
         planeId = calData[i]->GetPlane();
-        padId = calData[i]->GetPad() - 1; // From 0 to 63 for X down and up
+        padId = calData[i]->GetPad(); // From 0 to 63 for X down and up
         q = calData[i]->GetQ();
 
         // FIXME: in November this should be OK!
         if (planeId == 1 || planeId == 2)
             fx[padId] += q; // Xup+Xdown
-        else
-            fy[padId] = q;
 
         if (q > qmx && (planeId == 1 || planeId == 2))
         {
             qmx = q;
             padmx = padId;
         }
+    }
+    // Reading the Input -- Cal Data for Y --
+    Int_t nHits1 = fMwpcCalDataCA1->GetEntries();
+    if (!nHits1)
+        return;
+
+    // Data from cal level
+    R3BMwpcCalData** calData1;
+    calData1 = new R3BMwpcCalData*[nHits1];
+
+    for (Int_t i = 0; i < nHits1; i++)
+    {
+        calData1[i] = (R3BMwpcCalData*)(fMwpcCalDataCA1->At(i));
+        planeId = calData1[i]->GetPlane();
+        padId = calData1[i]->GetPad(); // From 0 to 63 for X down and up
+        q = calData1[i]->GetQ();
+
+        if (planeId == 3)
+            fy[padId] = q;
         if (q > qmy && planeId == 3)
         {
             qmy = q;
@@ -144,23 +168,25 @@ void R3BMwpc2Cal2Hit::Exec(Option_t* option)
         qleft = (Double_t)fx[padmx - 1];
         qright = (Double_t)fx[padmx + 1];
         if (qleft > 0 && qright > 0)
-            x = GetPostionX(qmx, padmx, qleft, qright);
+            x = GetPositionX(qmx, padmx, qleft, qright);
         // Obtain position Y ----
         qdown = fy[padmy - 1];
         qup = fy[padmy + 1];
         if (qdown > 0 && qup > 0)
-            y = GetPostionY(qmy, padmy, qdown, qup);
+            y = GetPositionY(qmy, padmy, qdown, qup);
 
         AddHitData(x, y);
     }
 
     if (calData)
         delete calData;
+    if (calData1)
+        delete calData1;
     return;
 }
 
 // -----   Protected method to obtain the position X ----------------------------
-Double_t R3BMwpc2Cal2Hit::GetPostionX(Double_t qmax, Int_t padmax, Double_t qleft, Double_t qright)
+Double_t R3BMwpc2Cal2Hit::GetPositionX(Double_t qmax, Int_t padmax, Double_t qleft, Double_t qright)
 {
     Double_t a3 = TMath::Pi() * fwx / (TMath::ACosH(0.5 * (TMath::Sqrt(qmax / qleft) + TMath::Sqrt(qmax / qright))));
     // Double_t a2 = gRandom->Uniform(-fwx / 2,fwx / 2);
@@ -171,7 +197,7 @@ Double_t R3BMwpc2Cal2Hit::GetPostionX(Double_t qmax, Int_t padmax, Double_t qlef
 }
 
 // -----   Protected method to obtain the position Y ----------------------------
-Double_t R3BMwpc2Cal2Hit::GetPostionY(Double_t qmax, Int_t padmax, Double_t qdown, Double_t qup)
+Double_t R3BMwpc2Cal2Hit::GetPositionY(Double_t qmax, Int_t padmax, Double_t qdown, Double_t qup)
 {
     Double_t a3 = TMath::Pi() * fwy / (TMath::ACosH(0.5 * (TMath::Sqrt(qmax / qdown) + TMath::Sqrt(qmax / qup))));
     // Double_t a2 = gRandom->Uniform(-fwy / 2, fwy / 2);

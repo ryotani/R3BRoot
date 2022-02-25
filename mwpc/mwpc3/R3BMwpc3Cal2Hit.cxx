@@ -189,7 +189,7 @@ void R3BMwpc3Cal2Hit::Exec(Option_t* option)
             // if(padmy==64) std::cout << padmy << " " << qmy << " " << qdown << " " << qup << std::endl;
             // if(padmy==63) std::cout << padmy << " " << qmy << " " << qdown << " " << qup << std::endl;
             if (qdown > 0 && qup > 0)
-                y = GetPositionY(qmy, padmy, qdown, qup);
+                y = -1.0 * GetPositionY(qmy, padmy, qdown, qup);
             // y = FittedHyperbolicSecant("Y",vQY,vStripY,qmy,padmy);
 
             AddHitData(x, y);
