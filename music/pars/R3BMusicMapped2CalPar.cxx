@@ -93,10 +93,7 @@ R3BMusicMapped2CalPar::R3BMusicMapped2CalPar(const TString& name,
 }
 
 // Virtual R3BMusicMapped2CalPar: Destructor
-R3BMusicMapped2CalPar::~R3BMusicMapped2CalPar()
-{
-    LOG(INFO) << "R3BMusicMapped2CalPar: Delete instance";
-}
+R3BMusicMapped2CalPar::~R3BMusicMapped2CalPar() { LOG(INFO) << "R3BMusicMapped2CalPar: Delete instance"; }
 
 // -----   Public method Init   --------------------------------------------
 InitStatus R3BMusicMapped2CalPar::Init()
@@ -162,7 +159,7 @@ InitStatus R3BMusicMapped2CalPar::Init()
         fg_anode[i]->SetMarkerColor(4);
         fg_anode[i]->SetMarkerStyle(20);
         fg_anode[i]->SetMarkerSize(1.2);
-	//
+        //
         fg_anode_result[i] = new TGraph();
         sprintf(Name1, "fg1_Anode_result_%d", i + 1);
         fg_anode_result[i]->SetName(Name1);
@@ -172,7 +169,7 @@ InitStatus R3BMusicMapped2CalPar::Init()
         fg_anode_result[i]->SetMarkerColor(4);
         fg_anode_result[i]->SetMarkerStyle(20);
         fg_anode_result[i]->SetMarkerSize(1.2);
-	//
+        //
         fg_anode2d[i] = new TGraph2D();
         sprintf(Name1, "fg1_Anode2d_%d; Drift Time (ns); Energy (a.u.); Position (mm)", i + 1);
         fg_anode2d[i]->SetName(Name1);
@@ -259,23 +256,26 @@ void R3BMusicMapped2CalPar::Exec(Option_t* option)
             for (Int_t j = 0; j < mulanode[fNumAnodes]; j++)
                 for (Int_t k = 0; k < mulanode[i]; k++)
                 {
-                    if (fLimit_left > dtime[k][i] - dtime[j][fNumAnodes] || fLimit_right < dtime[k][i] - dtime[j][fNumAnodes] ) continue;
+                    if (fLimit_left > dtime[k][i] - dtime[j][fNumAnodes] ||
+                        fLimit_right < dtime[k][i] - dtime[j][fNumAnodes])
+                        continue;
                     if (energy[k][i] > 0.)
                     { // Anode is 50mm, first anode is at 175mm with respect to the center of music detector
-		      if(fg_anode[i]->GetN()<=fMinStatistics)
-                        fg_anode[i]->SetPoint(fg_anode[i]->GetN(),
-                                              dtime[k][i] - dtime[j][fNumAnodes],
-                                              fa->Eval(fPosMusic - 175.0 + i * 50.0));
+                        if (fg_anode[i]->GetN() <= fMinStatistics)
+                            fg_anode[i]->SetPoint(fg_anode[i]->GetN(),
+                                                  dtime[k][i] - dtime[j][fNumAnodes],
+                                                  fa->Eval(fPosMusic - 175.0 + i * 50.0));
                     }
-		    if(fg_anode2d[i]->GetN()<=fMinStatistics){
-		      fg_anode2d[i]->SetPoint(fg_anode2d[i]->GetN(),
-					      dtime[k][i] - dtime[j][fNumAnodes],
-					      energy[k][i],
-					      fa->Eval(fPosMusic - 175.0 + i * 50.0));
-		    }
-		    v_pos[i].push_back(fa->Eval(fPosMusic - 175.0 + i * 50.0));
-		    v_dt[i].push_back(dtime[k][i] - dtime[j][fNumAnodes]);
-		    v_e[i].push_back(energy[k][i]);
+                    if (fg_anode2d[i]->GetN() <= fMinStatistics)
+                    {
+                        fg_anode2d[i]->SetPoint(fg_anode2d[i]->GetN(),
+                                                dtime[k][i] - dtime[j][fNumAnodes],
+                                                energy[k][i],
+                                                fa->Eval(fPosMusic - 175.0 + i * 50.0));
+                    }
+                    v_pos[i].push_back(fa->Eval(fPosMusic - 175.0 + i * 50.0));
+                    v_dt[i].push_back(dtime[k][i] - dtime[j][fNumAnodes]);
+                    v_e[i].push_back(energy[k][i]);
                 }
         }
     }
@@ -290,7 +290,7 @@ void R3BMusicMapped2CalPar::Exec(Option_t* option)
 
 void R3BMusicMapped2CalPar::FinishTask()
 {
-  LOG(INFO) << "R3BMusicMapped2CalPar: FinishTask. Num Anodes: " << fNumAnodes;
+    LOG(INFO) << "R3BMusicMapped2CalPar: FinishTask. Num Anodes: " << fNumAnodes;
     fCal_Par->SetNumAnodes(fNumAnodes);
     fCal_Par->SetNumParamsEFit(fNumParams);
     fCal_Par->SetNumParamsPosFit(fNumPosParams);
@@ -298,88 +298,86 @@ void R3BMusicMapped2CalPar::FinishTask()
     fCal_Par->GetPosParams()->Set(fNumPosParams * fNumAnodes);
 
     TF1* fit = new TF1("fit", "pol1", fLimit_left, fLimit_right);
-    TF2* fit2d = new TF2("fit2d", "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0,8000);
+    TF2* fit2d = new TF2("fit2d", "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0, 8000);
     TF1* fit_result = new TF1("fit_result", "pol1", fLimit_left, fLimit_right);
     fit->SetLineColor(2);
     for (Int_t i = 0; i < fNumAnodes; i++)
     {
-      /*
-        if (fg_anode[i]->GetN() >= fMinStatistics)
+        /*
+          if (fg_anode[i]->GetN() >= fMinStatistics)
+          {
+              fCal_Par->SetInUse(1, i + 1);
+              fg_anode[i]->Fit("fit", "QR0");
+              Double_t par[fNumPosParams];
+              fit->GetParameters(&par[0]);
+              fCal_Par->SetPosParams(par[0], i * fNumPosParams);
+              fCal_Par->SetPosParams(par[1], i * fNumPosParams + 1);
+          }
+          else
+              fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
+        */
+        //  fg_anode[i]->Draw("p");
+        //  fit->Draw("same");
+        fg_anode[i]->Write();
+        //
+        if (fg_anode2d[i]->GetN() >= fMinStatistics)
         {
-            fCal_Par->SetInUse(1, i + 1);
-            fg_anode[i]->Fit("fit", "QR0");
+            // fit2d->FixParameter(2,0);
+            fg_anode2d[i]->Fit("fit2d", "R0");
             Double_t par[fNumPosParams];
-            fit->GetParameters(&par[0]);
-            fCal_Par->SetPosParams(par[0], i * fNumPosParams);
-            fCal_Par->SetPosParams(par[1], i * fNumPosParams + 1);
+            fit2d->GetParameters(&par[0]);
+            fCal_Par->SetPosParams(par[0], i * fNumPosParams);     // Position
+            fCal_Par->SetPosParams(par[1], i * fNumPosParams + 1); // Coefficient to DT
+            fCal_Par->SetPosParams(par[2], i * fNumPosParams + 2); // Coefficient to Energy
+            //
+            fg_anode2d[i]->Draw("p");
+            fit2d->Draw("same");
+            fg_anode2d[i]->Write();
+            //
+
+            for (Int_t n = 0; n < fg_anode2d[i]->GetN(); n++)
+            {
+                Double_t ene = 0., dt = 0., val = 0.;
+                fg_anode2d[i]->GetPoint(n, dt, ene, val);
+                fg_anode_result[i]->SetPoint(n, dt, val - fit2d->GetParameter(2) * ene);
+            }
+            fg_anode_result[i]->Fit("fit_result", "QR");
+            fg_anode_result[i]->Draw("p");
+            fit_result->Draw("same");
+            fg_anode_result[i]->Write();
         }
         else
             fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
-      */
-	//  fg_anode[i]->Draw("p");
-	//  fit->Draw("same");
-        fg_anode[i]->Write();
-	//
-	if (fg_anode2d[i]->GetN() >= fMinStatistics)
-	  {
-	    //fit2d->FixParameter(2,0);
-	    fg_anode2d[i]->Fit("fit2d", "R0");
-	    Double_t par[fNumPosParams];
-	    fit2d->GetParameters(&par[0]);
-	    fCal_Par->SetPosParams(par[0], i * fNumPosParams); // Position
-	    fCal_Par->SetPosParams(par[1], i * fNumPosParams + 1); // Coefficient to DT
-	    fCal_Par->SetPosParams(par[2], i * fNumPosParams + 2); // Coefficient to Energy
-	    //
-	    fg_anode2d[i]->Draw("p");
-	    fit2d->Draw("same");
-	    fg_anode2d[i]->Write();
-	    //
-	    
-	    for(Int_t n = 0; n < fg_anode2d[i]->GetN(); n++)
-	      {
-		Double_t ene = 0., dt = 0., val = 0.;
-		fg_anode2d[i]->GetPoint(n, dt, ene, val);
-		fg_anode_result[i]->SetPoint(n,
-					  dt,
-					  val - fit2d->GetParameter(2) * ene);
-	      }
-	    fg_anode_result[i]->Fit("fit_result","QR");
-	    fg_anode_result[i]->Draw("p");
-	    fit_result->Draw("same");
-	    fg_anode_result[i]->Write();
-	    
-	  }
-	else
-	  fCal_Par->SetAnodeCalParams(-1.0, i * fNumParams + 1);
-	//
-	if(v_pos[i].size()!=v_dt[i].size()||v_pos[i].size()!=v_e[i].size())
-	  LOG(ERROR)<<"Size of vectors are different";
-	ROOT::Fit::BinData points(v_pos[i].size(),2);
-	Double_t xx[2];
-	//for(int i_v=0; i_v < v_pos[i].size(); i_v++)
-	for(int i_v=0; i_v < 1000; i_v++)
-	{
-	  xx[0] = v_dt[i].at(i_v);
-	  xx[1] = v_e[i].at(i_v);
-	  points.Add(xx, v_pos[i].at(i_v),1);
-	}
-	ROOT::Fit::Fitter fitter;
-	//TF2* fit2d_2 = new TF2(Form("fit2d_2%i",i), "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0,8000);
-	ROOT::Math::WrappedMultiTF1 wf(*fit2d);
-	fitter.SetFunction(wf);
-	//
-	bool ret = fitter.Fit(points);
-	//	LOG(INFO)<<"Fitter for "<<i<<" size "<< v_pos[i].size() <<" "<<ret;
-	if (ret ||1 ){
-	  const ROOT::Fit::FitResult & res = fitter.Result();
-	  // print result (should be around 1)
-	  res.Print(std::cout);
-	  // copy all fit result info (values, chi2, etc..) in TF3
-	  fit2d->SetFitResult(res);
-	  // test fit p-value (chi2 probability)
-	  double prob = res.Prob();
-	  LOG(INFO)<< "Good fit : p-value  = " << prob << std::endl;
-	}
+        //
+        if (v_pos[i].size() != v_dt[i].size() || v_pos[i].size() != v_e[i].size())
+            LOG(ERROR) << "Size of vectors are different";
+        ROOT::Fit::BinData points(v_pos[i].size(), 2);
+        Double_t xx[2];
+        // for(int i_v=0; i_v < v_pos[i].size(); i_v++)
+        for (int i_v = 0; i_v < 1000; i_v++)
+        {
+            xx[0] = v_dt[i].at(i_v);
+            xx[1] = v_e[i].at(i_v);
+            points.Add(xx, v_pos[i].at(i_v), 1);
+        }
+        ROOT::Fit::Fitter fitter;
+        // TF2* fit2d_2 = new TF2(Form("fit2d_2%i",i), "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0,8000);
+        ROOT::Math::WrappedMultiTF1 wf(*fit2d);
+        fitter.SetFunction(wf);
+        //
+        bool ret = fitter.Fit(points);
+        //	LOG(INFO)<<"Fitter for "<<i<<" size "<< v_pos[i].size() <<" "<<ret;
+        if (ret || 1)
+        {
+            const ROOT::Fit::FitResult& res = fitter.Result();
+            // print result (should be around 1)
+            res.Print(std::cout);
+            // copy all fit result info (values, chi2, etc..) in TF3
+            fit2d->SetFitResult(res);
+            // test fit p-value (chi2 probability)
+            double prob = res.Prob();
+            LOG(INFO) << "Good fit : p-value  = " << prob << std::endl;
+        }
     }
     fCal_Par->setChanged();
 }

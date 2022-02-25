@@ -52,7 +52,7 @@ R3BTwimMapped2CalPar::R3BTwimMapped2CalPar(const TString& name,
     , fNumAnodes(16)   // 16 anodes
     , fNumAnodesRef(2) // 2 anode for TREF
     , fMaxMult(20)
-    , fMinStadistics(1000)
+    , fMinStatistics(1000)
     , fLimit_left(0)
     , fLimit_right(24000)
     , fNumParams(3)
@@ -141,6 +141,8 @@ InitStatus R3BTwimMapped2CalPar::Init()
     // Define TGraph for fits
     char Name1[255];
     fg_anode = new TGraph*[fNumSec * fNumAnodes];
+    fg_anode_result = new TGraph*[fNumSec * fNumAnodes];
+    fg_anode2d = new TGraph2D*[fNumSec * fNumAnodes];
     for (Int_t s = 0; s < fNumSec; s++)
         for (Int_t i = 0; i < fNumAnodes; i++)
         {
@@ -153,6 +155,27 @@ InitStatus R3BTwimMapped2CalPar::Init()
             fg_anode[s * fNumAnodes + i]->SetMarkerColor(4);
             fg_anode[s * fNumAnodes + i]->SetMarkerStyle(20);
             fg_anode[s * fNumAnodes + i]->SetMarkerSize(1.2);
+            //
+            fg_anode_result[s * fNumAnodes + i] = new TGraph();
+            sprintf(Name1, "fg1_sec%d_Anode_result_%d", s + 1, i + 1);
+            fg_anode_result[s * fNumAnodes + i]->SetName(Name1);
+            fg_anode_result[s * fNumAnodes + i]->SetTitle(Name1);
+            fg_anode_result[s * fNumAnodes + i]->SetFillColor(1);
+            fg_anode_result[s * fNumAnodes + i]->SetLineColor(0);
+            fg_anode_result[s * fNumAnodes + i]->SetMarkerColor(4);
+            fg_anode_result[s * fNumAnodes + i]->SetMarkerStyle(20);
+            fg_anode_result[s * fNumAnodes + i]->SetMarkerSize(1.2);
+            //
+            fg_anode2d[s * fNumAnodes + i] = new TGraph2D();
+            sprintf(Name1, "fg1_sec%d_Anode2d_%d; Drift Time (ns); Energy (a.u.); Position (mm)", s + 1, i + 1);
+            fg_anode2d[s * fNumAnodes + i]->SetName(Name1);
+            fg_anode2d[s * fNumAnodes + i]->SetTitle(Name1);
+            fg_anode2d[s * fNumAnodes + i]->SetFillColor(1);
+            fg_anode2d[s * fNumAnodes + i]->SetLineColor(0);
+            fg_anode2d[s * fNumAnodes + i]->SetMarkerColor(4);
+            fg_anode2d[s * fNumAnodes + i]->SetMarkerStyle(20);
+            fg_anode2d[s * fNumAnodes + i]->SetMarkerSize(1.2);
+            // fg_anode2d[s * fNumAnodes + i]->GetXaxis()->SetRangeUser(0, 2 * fLimit_right);
         }
 
     return kSUCCESS;
@@ -240,16 +263,23 @@ void R3BTwimMapped2CalPar::Exec(Option_t* option)
                         {
                             if (fE[s][k][i] > 0. && (fExpId == 444 || fExpId == 467))
                             { // Anode is 25mm, first anode is at -187.5mm with respect to the center of twim detector
+                                Double_t dt = NAN;
                                 if (i < fNumAnodes / 2)
-                                    fg_anode[s * fNumAnodes + i]->SetPoint(fg_anode[s * fNumAnodes + i]->GetN() + 1,
-                                                                           fDT[s][k][i] - fDT[s][j][fNumAnodes],
-                                                                           fa->Eval(fPosTwim - 187.5 + i * 25.0));
+                                    dt = fDT[s][k][i] - fDT[s][j][fNumAnodes];
                                 else
-                                    fg_anode[s * fNumAnodes + i]->SetPoint(fg_anode[s * fNumAnodes + i]->GetN() + 1,
-                                                                           fDT[s][k][i] - fDT[s][j][fNumAnodes + 1],
+                                    dt = fDT[s][k][i] - fDT[s][j][fNumAnodes + 1];
+                                if (fg_anode[s * fNumAnodes + i]->GetN() <= fMinStatistics && dt > 0.5 * fLimit_left &&
+                                    dt < 2. * fLimit_right)
+                                {
+                                    fg_anode[s * fNumAnodes + i]->SetPoint(fg_anode[s * fNumAnodes + i]->GetN(),
+                                                                           dt,
                                                                            fa->Eval(fPosTwim - 187.5 + i * 25.0));
+                                    fg_anode2d[s * fNumAnodes + i]->SetPoint(fg_anode2d[s * fNumAnodes + i]->GetN(),
+                                                                             dt,
+                                                                             fE[s][k][i],
+                                                                             fa->Eval(fPosTwim - 187.5 + i * 25.0));
+                                }
                             }
-
                             if (fE[s][k][i] > 0. && fExpId == 455)
                             { // Anode is 25mm, first anode is at -187.5mm with respect to the center of twim detector
 
@@ -277,6 +307,8 @@ void R3BTwimMapped2CalPar::FinishTask()
     fCal_Par->SetNumParamsPosFit(fNumPosParams);
 
     TF1* fit = new TF1("fit", "pol1", fLimit_left, fLimit_right);
+    TF2* fit2d = new TF2("fit2d", "[0]+[1]*x+[2]*y", fLimit_left, fLimit_right, 0, 8000);
+    TF1* fit_result = new TF1("fit_result", "pol1", fLimit_left, fLimit_right);
     fit->SetLineColor(2);
 
     for (Int_t s = 0; s < fNumSec; s++)
@@ -286,19 +318,52 @@ void R3BTwimMapped2CalPar::FinishTask()
 
         for (Int_t i = 0; i < fNumAnodes; i++)
         {
-            if (fg_anode[s * fNumAnodes + i]->GetN() > fMinStadistics)
+            /*
+                  if (fg_anode[s * fNumAnodes + i]->GetN() > fMinStatistics)
+                  {
+                      fCal_Par->SetInUse(1, s + 1, i + 1);
+                      fg_anode[s * fNumAnodes + i]->Fit("fit", "QR0");
+                      Double_t par[fNumPosParams];
+                      fit->GetParameters(&par[0]);
+                      fCal_Par->SetPosParams(par[0], s, i, 1);
+                      fCal_Par->SetPosParams(par[1], s, i, 2);
+                  }
+                  else
+                  {
+                      fCal_Par->SetAnodeCalParams(0.0, s, i, 1);
+                      fCal_Par->SetAnodeCalParams(-1.0, s, i, 2);
+                  }
+            */
+            if (fg_anode2d[s * fNumAnodes + i]->GetN() >= fMinStatistics)
             {
-                fCal_Par->SetInUse(1, s + 1, i + 1);
-                fg_anode[s * fNumAnodes + i]->Fit("fit", "QR0");
+                fg_anode2d[s * fNumAnodes + i]->Fit("fit2d", "QR0");
                 Double_t par[fNumPosParams];
-                fit->GetParameters(&par[0]);
-                fCal_Par->SetPosParams(par[0], s, i, 1);
-                fCal_Par->SetPosParams(par[1], s, i, 2);
+                fit2d->GetParameters(&par[0]);
+                fCal_Par->SetPosParams(par[0], s, i, 1); // Position
+                fCal_Par->SetPosParams(par[1], s, i, 2); // Coefficient to DT
+                fCal_Par->SetPosParams(par[2], s, i, 3); // Coefficient to Energy
+                //
+                fg_anode2d[s * fNumAnodes + i]->Draw("p");
+                fit2d->Draw("same");
+                fg_anode2d[s * fNumAnodes + i]->Write();
+                //
+
+                for (Int_t n = 0; n < fg_anode2d[s * fNumAnodes + i]->GetN(); n++)
+                {
+                    Double_t ene = 0., dt = 0., val = 0.;
+                    fg_anode2d[s * fNumAnodes + i]->GetPoint(n, dt, ene, val);
+                    fg_anode_result[s * fNumAnodes + i]->SetPoint(n, dt, val - fit2d->GetParameter(2) * ene);
+                }
+                fg_anode_result[s * fNumAnodes + i]->Fit("fit_result", "QR");
+                fg_anode_result[s * fNumAnodes + i]->Draw("p");
+                fit_result->Draw("same");
+                fg_anode_result[s * fNumAnodes + i]->Write();
             }
             else
             {
-                fCal_Par->SetAnodeCalParams(0.0, s, i, 1);
-                fCal_Par->SetAnodeCalParams(-1.0, s, i, 2);
+                fCal_Par->SetPosParams(0, s, i, 1);    // Position
+                fCal_Par->SetPosParams(-100, s, i, 2); // Coefficient to DT
+                fCal_Par->SetPosParams(0, s, i, 3);    // Coefficient to Energy
             }
 
             fg_anode[s * fNumAnodes + i]->Write();
