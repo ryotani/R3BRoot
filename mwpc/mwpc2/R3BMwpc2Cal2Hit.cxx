@@ -123,7 +123,7 @@ void R3BMwpc2Cal2Hit::Exec(Option_t* option)
     {
         calData[i] = (R3BMwpcCalData*)(fMwpcCalDataCA2->At(i));
         planeId = calData[i]->GetPlane();
-        padId = calData[i]->GetPad(); // From 0 to 63 for X down and up
+        padId = calData[i]->GetPad() - 1; // From 0 to 63 for X down and up
         q = calData[i]->GetQ();
 
         // FIXME: in November this should be OK!
@@ -149,7 +149,7 @@ void R3BMwpc2Cal2Hit::Exec(Option_t* option)
     {
         calData1[i] = (R3BMwpcCalData*)(fMwpcCalDataCA1->At(i));
         planeId = calData1[i]->GetPlane();
-        padId = calData1[i]->GetPad(); // From 0 to 63 for X down and up
+        padId = calData1[i]->GetPad() - 1; // From 0 to 63 for X down and up
         q = calData1[i]->GetQ();
 
         if (planeId == 3)

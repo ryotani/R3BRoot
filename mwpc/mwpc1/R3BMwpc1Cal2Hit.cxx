@@ -154,7 +154,7 @@ void R3BMwpc1Cal2Hit::Exec(Option_t* option)
     {
         calData2[i] = (R3BMwpcCalData*)(fMwpcCalDataCA2->At(i));
         planeId = calData2[i]->GetPlane();
-        padId = calData2[i]->GetPad(); // From 0 to 63 for X down and up
+        padId = calData2[i]->GetPad() - 1; // From 0 to 63 for X down and up
         q = calData2[i]->GetQ();
 
         if (planeId == 3)
